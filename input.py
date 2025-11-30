@@ -1,4 +1,7 @@
+import csv
 from datetime import datetime
+
+DATA_FILE = "data/expenses.csv"   # 給 B 組員讀的檔案
 
 def add_expense():
     print("\n========================")
@@ -35,6 +38,11 @@ def add_expense():
 
     # 備註（可留空）
     notes = input("備註（可留空）： ").strip()
+
+    # 寫入 CSV
+    with open(DATA_FILE, "a", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow([date, amount, category, notes])
 
     print("========================")
     print("✅ 新增成功！")
