@@ -25,7 +25,7 @@ div[data-testid="stTextInput"] {
     top: 65px;
     left: 600px;
     width: 250px;
-    z-index: 999;
+    z-index: 999; 
 }
 </style>
 """, unsafe_allow_html=True)
