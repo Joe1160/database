@@ -158,7 +158,7 @@ def page_search_groups():
     with st.form("group_search_form", clear_on_submit=False):
         c1, c2 = st.columns([1.3, 1])
         with c1:
-            q_in = st.text_input("團體名稱（英文關鍵字）", placeholder="")
+            q_in = st.text_input("團體名稱", placeholder="")
         with c2:
             company_opts = ["全部"] + companies["company_name"].tolist() + ["其他"]
             company_pick = st.selectbox("進階：公司篩選", company_opts, index=0)
@@ -169,6 +169,9 @@ def page_search_groups():
     if submitted:
         st.session_state["groups_q"] = q_in.strip()
         st.session_state["groups_company_pick"] = company_pick
+
+        # ✅ 重要：每次按 Enter 重新搜尋，就清掉之前選過的團
+        st.session_state.pop("selected_group_id", None)
 
     # 初次進入頁面：還沒搜尋就先停在這裡（不顯示結果/筆數/詳細資訊）
     if "groups_q" not in st.session_state and "groups_company_pick" not in st.session_state:
@@ -212,7 +215,7 @@ def page_search_groups():
         """
 
     # ---------- 團體 ICON/圖片 卡片網格 ----------
-    st.subheader("📌 團體列表（點卡片查看）")
+    st.subheader("📌 團體列表（點擊查看資訊）")
 
     cols = st.columns(4, gap="small")
     for i, r in enumerate(df.itertuples()):
@@ -364,50 +367,66 @@ def page_search_groups():
             st.divider()
 
 
-
-
-
 def page_search_members():
     st.header("🔎 搜尋成員")
 
-    groups = get_groups()
-    nat = get_nationalities()
+    ensure_db()
 
-    col1, col2, col3 = st.columns([1.2, 1, 1])
-    with col1:
-        q = st.text_input("成員關鍵字（stage_name / real_name）", placeholder="例如：Sana / Kim …").strip()
-    with col2:
-        group_opts = ["全部"] + groups["group_name"].tolist()
-        group_pick = st.selectbox("進階：團體篩選", group_opts, index=0)
-    with col3:
-        nat_opts = ["全部"] + nat["nationality_code"].tolist()
-        nat_pick = st.selectbox("進階：國籍篩選", nat_opts, index=0)
+    # 進階選單資料
+    groups = get_groups()                 # 你已有：group_id, group_name...
+    nat = get_nationalities()             # 你已有：nationality_code...
 
+    group_opts = ["全部"] + (groups["group_name"].tolist() if not groups.empty else [])
+    nat_opts = ["全部"] + (nat["nationality_code"].tolist() if not nat.empty else [])
+
+    # ---- 1) 搜尋表單：按 Enter 送出（不顯示按鈕）----
+    with st.form("member_search_form", clear_on_submit=False):
+        c1, c2, c3 = st.columns([1.4, 1, 1])
+        with c1:
+            q_in = st.text_input("成員藝名（stage_name）", placeholder="")
+        with c2:
+            group_pick_in = st.selectbox("進階：團體", group_opts, index=0)
+        with c3:
+            nat_pick_in = st.selectbox("進階：國籍", nat_opts, index=0)
+
+        submitted = st.form_submit_button("搜尋")
+
+    if submitted:
+        st.session_state["members_q"] = q_in.strip()
+        st.session_state["members_group_pick"] = group_pick_in
+        st.session_state["members_nat_pick"] = nat_pick_in
+        st.session_state.pop("selected_member_id", None)  # 重新搜尋就清掉舊選取
+
+    # 初次進入：不顯示任何結果
+    if "members_q" not in st.session_state and "members_group_pick" not in st.session_state and "members_nat_pick" not in st.session_state:
+        st.info("請輸入藝名後按 Enter 進行搜尋。")
+        return
+
+    q = st.session_state.get("members_q", "").strip()
+    group_pick = st.session_state.get("members_group_pick", "全部")
+    nat_pick = st.session_state.get("members_nat_pick", "全部")
+
+    # ---- 2) 查詢：stage_name + 進階篩選（團體 / 國籍）----
     sql = """
     SELECT
       m.member_id,
-      g.group_name,
       m.stage_name,
-      m.real_name,
-      m.birth_date,
-      GROUP_CONCAT(mn.nationality_code, ',') AS nationalities
+      g.group_name
     FROM members m
-    JOIN groups g ON m.group_id=g.group_id
-    LEFT JOIN member_nationalities mn ON mn.member_id=m.member_id
+    JOIN groups g ON m.group_id = g.group_id
     WHERE 1=1
     """
     params = []
+
+    if q:
+        sql += " AND m.stage_name LIKE ? "
+        params.append(f"%{q}%")
 
     if group_pick != "全部":
         sql += " AND g.group_name = ? "
         params.append(group_pick)
 
-    if q:
-        sql += " AND (m.stage_name LIKE ? OR m.real_name LIKE ?) "
-        params.extend([f"%{q}%", f"%{q}%"])
-
     if nat_pick != "全部":
-        # 篩出擁有該國籍的 member
         sql += """
         AND EXISTS (
           SELECT 1 FROM member_nationalities mn2
@@ -416,22 +435,77 @@ def page_search_members():
         """
         params.append(nat_pick)
 
-    sql += """
-    GROUP BY m.member_id
-    ORDER BY g.group_name COLLATE NOCASE, m.stage_name COLLATE NOCASE;
-    """
+    sql += " ORDER BY g.group_name COLLATE NOCASE, m.stage_name COLLATE NOCASE; "
 
     df = run_df(sql, tuple(params))
-    st.write(f"共找到 **{len(df)}** 位成員")
+
+    st.caption(f"共找到 {len(df)} 位成員")
     if df.empty:
         st.info("沒有符合條件的成員。")
         return
 
-    st.dataframe(
-        df[["group_name", "stage_name", "real_name", "birth_date", "nationalities"]],
-        use_container_width=True,
-        hide_index=True,
-    )
+    # ---- 3) 結果：只顯示名字（按鈕）----
+    st.subheader("📌 成員列表（點名字查看）")
+
+    cols = st.columns(4, gap="small")
+    for i, r in enumerate(df.itertuples()):
+        with cols[i % 4]:
+            if st.button(r.stage_name, key=f"member_btn_{r.member_id}", use_container_width=True):
+                st.session_state["selected_member_id"] = int(r.member_id)
+
+    st.divider()
+
+    # ---- 4) 未點選前，不顯示詳細資訊 ----
+    if "selected_member_id" not in st.session_state:
+        st.info("請先點選上方任一成員，查看詳細資訊。")
+        return
+
+    mid = int(st.session_state["selected_member_id"])
+
+    # ---- 5) 詳細資訊（圖片左 / 資訊右）----
+    detail = run_df(
+        """
+        SELECT
+          m.member_id,
+          m.stage_name,
+          m.real_name,
+          m.birth_date,
+          m.image_path,
+          g.group_name,
+          c.company_name,
+          GROUP_CONCAT(mn.nationality_code, ',') AS nationalities
+        FROM members m
+        JOIN groups g ON m.group_id = g.group_id
+        LEFT JOIN companies c ON g.company_id = c.company_id
+        LEFT JOIN member_nationalities mn ON mn.member_id = m.member_id
+        WHERE m.member_id = ?
+        GROUP BY m.member_id;
+        """,
+        (mid,),
+    ).iloc[0]
+
+    st.subheader("ℹ️ 成員資訊")
+
+    left, right = st.columns([1, 2.2], gap="large")
+
+    with left:
+        img = norm(detail.get("image_path"))
+        if img:
+            try:
+                st.image(img, width=260)
+            except Exception:
+                st.caption(f"⚠️ 圖片讀取失敗：{img}")
+        else:
+            st.caption("（此成員尚未提供圖片）")
+
+    with right:
+        st.markdown(f"### {detail['stage_name']}")
+        if pd.notna(detail["real_name"]):
+            st.write("**本名：**", detail["real_name"])
+        st.write("**所屬團體：**", detail["group_name"])
+        st.write("**所屬公司：**", detail["company_name"] if pd.notna(detail["company_name"]) else "其他")
+        st.write("**生日：**", detail["birth_date"] if pd.notna(detail["birth_date"]) else "（未填）")
+        st.write("**國籍：**", detail["nationalities"] if pd.notna(detail["nationalities"]) else "（未填）")
 
 
 def page_search_songs():
