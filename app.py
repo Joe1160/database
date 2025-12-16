@@ -175,10 +175,10 @@ def page_search_groups():
     with st.form("group_search_form", clear_on_submit=False):
         c1, c2 = st.columns([1.3, 1])
         with c1:
-            q_in = st.text_input("團體名稱", placeholder="")
+            q_in = st.text_input("團體名稱 group name", placeholder="")
         with c2:
             company_opts = ["全部"] + companies["company_name"].tolist() + ["其他"]
-            company_pick = st.selectbox("進階搜尋：公司", company_opts, index=0)
+            company_pick = st.selectbox("進階搜尋：公司 company", company_opts, index=0)
 
         submitted = st.form_submit_button("搜尋")
 
@@ -400,11 +400,11 @@ def page_search_members():
     with st.form("member_search_form", clear_on_submit=False):
         c1, c2, c3 = st.columns([1.4, 1, 1])
         with c1:
-            q_in = st.text_input("成員藝名（stage name）", placeholder="")
+            q_in = st.text_input("成員藝名 stage name", placeholder="")
         with c2:
-            group_pick_in = st.selectbox("進階搜尋：團體", group_opts, index=0)
+            group_pick_in = st.selectbox("進階搜尋：團體 group", group_opts, index=0)
         with c3:
-            nat_pick_in = st.selectbox("進階搜尋：國籍", nat_opts, index=0)
+            nat_pick_in = st.selectbox("進階搜尋：國籍 nationality", nat_opts, index=0)
 
         submitted = st.form_submit_button("搜尋")
 
@@ -535,13 +535,13 @@ def page_search_songs():
     with st.form("song_search_form", clear_on_submit=False):
         col1, col2, col3 = st.columns([1.4, 1, 1])
         with col1:
-            q_in = st.text_input("歌名關鍵字", placeholder="")
+            q_in = st.text_input("歌曲名稱 song title", placeholder="")
         with col2:
             group_opts = ["全部"] + groups["group_name"].tolist()
-            group_pick_in = st.selectbox("進階搜尋：團體", group_opts, index=0)
+            group_pick_in = st.selectbox("進階搜尋：團體 group", group_opts, index=0)
         with col3:
-            lang_opts = ["全部"] + RELEASE_LANGS
-            lang_pick_in = st.selectbox("進階搜尋：語言", lang_opts, index=0)
+            lang_opts = ["全部"] + RELEASE_LANGS 
+            lang_pick_in = st.selectbox("進階搜尋：語言 language", lang_opts, index=0)
 
         submitted = st.form_submit_button("搜尋")
 
@@ -648,11 +648,11 @@ def page_add_group():
     company_opts = ["（不綁定）"] + companies["company_name"].tolist()
 
     with st.form("add_group", clear_on_submit=True):
-        group_name = st.text_input("團體名稱（必填，且不可和已經有的團名一樣）").strip()
-        company_pick = st.selectbox("公司", company_opts, index=0)
+        group_name = st.text_input("團體名稱 group name（必填，且不可和已經有的團名一樣）").strip()
+        company_pick = st.selectbox("公司 company", company_opts, index=0)
 
-        debut_date = st.text_input("出道日（YYYY-MM-DD，可空）").strip()
-        fandom_name = st.text_input("粉絲名（可空）").strip()
+        debut_date = st.text_input("出道日 debut date（YYYY-MM-DD，可空）").strip()
+        fandom_name = st.text_input("粉絲名 fandom name（可空）").strip()
         img = st.file_uploader("團體 LOGO（可選，請上傳 jpg/png 檔）", type=["jpg", "jpeg", "png"])
 
         submit = st.form_submit_button("新增")
@@ -722,13 +722,13 @@ def page_add_member():
     nat_opts = nat["nationality_code"].tolist()
 
     with st.form("add_member", clear_on_submit=True):
-        group_pick = st.selectbox("所屬團體", group_opts)
+        group_pick = st.selectbox("選擇團體 group", group_opts)
         stage_name = st.text_input("藝名 stage name（必填）").strip()
         real_name = st.text_input("本名 real name（可空）").strip()
-        birth_date = st.text_input("生日（YYYY-MM-DD，可空）").strip()
-        nat_pick = st.multiselect("國籍（可多選，可空）", nat_opts)
+        birth_date = st.text_input("生日 birth date（YYYY-MM-DD，可空）").strip()
+        nat_pick = st.multiselect("國籍 nationality（可多選，可空）", nat_opts)
 
-        img = st.file_uploader("成員照片（可選，jpg/png）", type=["jpg", "jpeg", "png"])
+        img = st.file_uploader("成員照片 photo（可選，jpg/png）", type=["jpg", "jpeg", "png"])
 
         submit = st.form_submit_button("新增")
 
@@ -789,20 +789,60 @@ def page_add_member():
         conn.close()
 
 
+def page_add_release():
+    st.header("➕ 新增發行作品（選擇團體）")
+
+    ensure_db()
+    groups = get_groups()
+    if groups.empty:
+        st.info("目前沒有團體資料。")
+        return
+
+    gpick = st.selectbox("所屬團體 group", groups["group_name"].tolist())
+    gid = int(groups.loc[groups["group_name"] == gpick, "group_id"].iloc[0])
+
+    with st.form("add_release_only", clear_on_submit=True):
+        new_name = st.text_input("發行作品名稱 release name（必填）").strip()
+        new_type = st.selectbox("發行作品類型 release type", RELEASE_TYPES)
+        new_lang = st.selectbox("發行作品語言 release language", RELEASE_LANGS)
+        new_date = st.text_input("發行日期 release date（可空）").strip()
+        submit = st.form_submit_button("新增")
+
+    if not submit:
+        return
+
+    if not new_name:
+        st.error("release_name 不能空白")
+        return
+
+    try:
+        run_exec(
+            """
+            INSERT INTO releases (group_id, release_name, release_type, release_lang, release_date)
+            VALUES (?, ?, ?, ?, ?);
+            """,
+            (gid, new_name, new_type, new_lang, norm(new_date)),
+        )
+        clear_cache()
+        st.success("✅ 新增 release 成功")
+    except sqlite3.IntegrityError as e:
+        st.error(f"新增失敗（可能 UNIQUE 或 CHECK 不符合）：{e}")
+
+
 def page_add_song():
-    st.header("➕ 新增歌曲（選團 → 選發行作品 → 新增歌）")
+    st.header("➕ 新增歌曲（選擇團體 → 選擇發行作品）")
 
     groups = get_groups()
     if groups.empty:
         st.warning("目前沒有任何團體，請先新增團體。")
         return
 
-    group_pick = st.selectbox("選擇團體", groups["group_name"].tolist())
+    group_pick = st.selectbox("選擇團體 group", groups["group_name"].tolist())
     gid = int(groups.loc[groups["group_name"] == group_pick, "group_id"].iloc[0])
 
     rel = get_releases_for_group(gid)
     if rel.empty:
-        st.warning("此團尚無發行作品（releases）。請先新增 releases（可用「修改資訊」裡的發行作品新增/修改功能）。")
+        st.warning("此團尚無發行作品（releases）。請先新增發行作品 release。")
         return
 
     rel_labels = []
@@ -812,12 +852,12 @@ def page_add_song():
         rel_labels.append(label)
         rel_id_by_label[label] = int(row.release_id)
 
-    rel_pick = st.selectbox("選擇發行作品", rel_labels)
+    rel_pick = st.selectbox("選擇發行作品 releases", rel_labels)
     release_id = rel_id_by_label[rel_pick]
 
     with st.form("add_song", clear_on_submit=True):
-        title = st.text_input("歌名 title（必填）").strip()
-        youtube_url = st.text_input("YouTube 連結（可空）").strip()
+        title = st.text_input("歌曲名稱 song title（必填）").strip()
+        youtube_url = st.text_input("YouTube Link（可空）").strip()
         submit = st.form_submit_button("新增")
 
     if not submit:
@@ -845,11 +885,11 @@ def page_add_song():
 # Page: Modify (Update)
 # ---------------------------
 def page_modify():
-    st.header("🛠️ 修改資訊（維修）")
+    st.header("🛠️ 修改資料")
 
     mode = st.selectbox(
         "選擇要修改的資料類型",
-        ["公司 companies", "團體 groups", "成員 members（含國籍）", "發行作品 releases", "歌曲 songs"],
+        ["公司 companies", "團體 groups", "成員 members", "發行作品 releases", "歌曲 songs"],
     )
 
     if mode.startswith("公司"):
@@ -858,16 +898,16 @@ def page_modify():
             st.info("目前沒有公司資料。")
             return
 
-        pick = st.selectbox("選擇公司", companies["company_name"].tolist())
+        pick = st.selectbox("選擇要修改的公司 company", companies["company_name"].tolist())
         row = run_df(
             "SELECT company_id, company_name, founder, founded_date FROM companies WHERE company_name=?;",
             (pick,),
         ).iloc[0]
 
         with st.form("edit_company"):
-            company_name = st.text_input("company_name（不建議改名，會影響關聯）", value=row["company_name"]).strip()
-            founder = st.text_input("founder", value=row["founder"] if pd.notna(row["founder"]) else "").strip()
-            founded_date = st.text_input("founded_date", value=row["founded_date"] if pd.notna(row["founded_date"]) else "").strip()
+            company_name = st.text_input("公司名稱 company name", value=row["company_name"]).strip()
+            founder = st.text_input("創辦人 founder", value=row["founder"] if pd.notna(row["founder"]) else "").strip()
+            founded_date = st.text_input("創辦日期 founded date", value=row["founded_date"] if pd.notna(row["founded_date"]) else "").strip()
             submit = st.form_submit_button("更新")
 
         if submit:
@@ -885,14 +925,14 @@ def page_modify():
             except sqlite3.IntegrityError as e:
                 st.error(f"更新失敗：{e}")
 
-    elif mode.startswith("團體"):
+    elif mode.startswith("團體 group"):
         groups = get_groups()
         companies = get_companies()
         if groups.empty:
             st.info("目前沒有團體資料。")
             return
 
-        pick = st.selectbox("選擇團體", groups["group_name"].tolist())
+        pick = st.selectbox("選擇要修改的團體 group", groups["group_name"].tolist())
         row = run_df(
             """
             SELECT g.group_id, g.group_name, g.debut_date, g.fandom_name, c.company_name
@@ -908,10 +948,10 @@ def page_modify():
         default_idx = company_opts.index(default_company) if default_company in company_opts else 0
 
         with st.form("edit_group"):
-            group_name = st.text_input("group_name（不建議改名，會影響外部資料）", value=row["group_name"]).strip()
-            company_pick = st.selectbox("company", company_opts, index=default_idx)
-            debut_date = st.text_input("debut_date", value=row["debut_date"] if pd.notna(row["debut_date"]) else "").strip()
-            fandom_name = st.text_input("fandom_name", value=row["fandom_name"] if pd.notna(row["fandom_name"]) else "").strip()
+            group_name = st.text_input("團體名字 group name", value=row["group_name"]).strip()
+            company_pick = st.selectbox("公司 company", company_opts, index=default_idx)
+            debut_date = st.text_input("出道日 debut date", value=row["debut_date"] if pd.notna(row["debut_date"]) else "").strip()
+            fandom_name = st.text_input("粉絲名 fandom name", value=row["fandom_name"] if pd.notna(row["fandom_name"]) else "").strip()
             submit = st.form_submit_button("更新")
 
         if submit:
@@ -939,7 +979,7 @@ def page_modify():
             st.info("目前沒有團體資料。")
             return
 
-        gpick = st.selectbox("先選團體", groups["group_name"].tolist())
+        gpick = st.selectbox("選擇團體 group", groups["group_name"].tolist())
         gid = int(groups.loc[groups["group_name"] == gpick, "group_id"].iloc[0])
 
         mem = run_df(
@@ -956,7 +996,7 @@ def page_modify():
             return
 
         mem_labels = mem["stage_name"].tolist()
-        mpick = st.selectbox("選擇成員", mem_labels)
+        mpick = st.selectbox("選擇要修改的成員 member", mem_labels)
         mrow = mem[mem["stage_name"] == mpick].iloc[0]
         member_id = int(mrow["member_id"])
 
@@ -968,10 +1008,10 @@ def page_modify():
         nat_opts = nat["nationality_code"].tolist()
 
         with st.form("edit_member"):
-            stage_name = st.text_input("stage_name（同團內唯一）", value=mrow["stage_name"]).strip()
-            real_name = st.text_input("real_name", value=mrow["real_name"] if pd.notna(mrow["real_name"]) else "").strip()
-            birth_date = st.text_input("birth_date", value=mrow["birth_date"] if pd.notna(mrow["birth_date"]) else "").strip()
-            nat_pick = st.multiselect("國籍（多選）", nat_opts, default=current_nat)
+            stage_name = st.text_input("藝名 stage name", value=mrow["stage_name"]).strip()
+            real_name = st.text_input("本名 real name", value=mrow["real_name"] if pd.notna(mrow["real_name"]) else "").strip()
+            birth_date = st.text_input("生日 birth date", value=mrow["birth_date"] if pd.notna(mrow["birth_date"]) else "").strip()
+            nat_pick = st.multiselect("國籍 nationality（多選）", nat_opts, default=current_nat)
             submit = st.form_submit_button("更新")
 
         if submit:
@@ -1009,7 +1049,7 @@ def page_modify():
             st.info("目前沒有團體資料。")
             return
 
-        gpick = st.selectbox("先選團體", groups["group_name"].tolist())
+        gpick = st.selectbox("選擇團體 group", groups["group_name"].tolist())
         gid = int(groups.loc[groups["group_name"] == gpick, "group_id"].iloc[0])
 
         rel = get_releases_for_group(gid)
@@ -1023,15 +1063,15 @@ def page_modify():
                 rel_labels.append(label)
                 rid_by_label[label] = int(row.release_id)
 
-            rpick = st.selectbox("選擇要修改的 release", rel_labels)
+            rpick = st.selectbox("選擇要修改的發行作品 release", rel_labels)
             rid = rid_by_label[rpick]
             rrow = rel[rel["release_id"] == rid].iloc[0]
 
             with st.form("edit_release"):
-                release_name = st.text_input("release_name", value=rrow["release_name"]).strip()
-                release_type = st.selectbox("release_type", RELEASE_TYPES, index=max(0, RELEASE_TYPES.index(rrow["release_type"])) if rrow["release_type"] in RELEASE_TYPES else 0)
-                release_lang = st.selectbox("release_lang", RELEASE_LANGS, index=max(0, RELEASE_LANGS.index(rrow["release_lang"])) if rrow["release_lang"] in RELEASE_LANGS else 0)
-                release_date = st.text_input("release_date", value=rrow["release_date"] if pd.notna(rrow["release_date"]) else "").strip()
+                release_name = st.text_input("發行作品名稱 release name", value=rrow["release_name"]).strip()
+                release_type = st.selectbox("發行作品類型 release type", RELEASE_TYPES, index=max(0, RELEASE_TYPES.index(rrow["release_type"])) if rrow["release_type"] in RELEASE_TYPES else 0)
+                release_lang = st.selectbox("發行作品語言 release language", RELEASE_LANGS, index=max(0, RELEASE_LANGS.index(rrow["release_lang"])) if rrow["release_lang"] in RELEASE_LANGS else 0)
+                release_date = st.text_input("發行日期 release date", value=rrow["release_date"] if pd.notna(rrow["release_date"]) else "").strip()
                 submit = st.form_submit_button("更新")
 
             if submit:
@@ -1049,39 +1089,13 @@ def page_modify():
                 except sqlite3.IntegrityError as e:
                     st.error(f"更新失敗（可能 UNIQUE 或 CHECK 不符合）：{e}")
 
-        st.divider()
-        st.subheader("➕ 新增 release（可選）")
-        with st.form("add_release", clear_on_submit=True):
-            new_name = st.text_input("release_name（必填）").strip()
-            new_type = st.selectbox("release_type", RELEASE_TYPES)
-            new_lang = st.selectbox("release_lang", RELEASE_LANGS)
-            new_date = st.text_input("release_date（可空）").strip()
-            submit2 = st.form_submit_button("新增 release")
-
-        if submit2:
-            if not new_name:
-                st.error("release_name 不能空白")
-            else:
-                try:
-                    run_exec(
-                        """
-                        INSERT INTO releases (group_id, release_name, release_type, release_lang, release_date)
-                        VALUES (?, ?, ?, ?, ?);
-                        """,
-                        (gid, new_name, new_type, new_lang, norm(new_date)),
-                    )
-                    clear_cache()
-                    st.success("✅ 新增 release 成功")
-                except sqlite3.IntegrityError as e:
-                    st.error(f"新增失敗（可能 UNIQUE 或 CHECK 不符合）：{e}")
-
     else:  # songs
         groups = get_groups()
         if groups.empty:
             st.info("目前沒有團體資料。")
             return
 
-        gpick = st.selectbox("先選團體", groups["group_name"].tolist())
+        gpick = st.selectbox("選擇團體 group", groups["group_name"].tolist())
         gid = int(groups.loc[groups["group_name"] == gpick, "group_id"].iloc[0])
 
         rel = get_releases_for_group(gid)
@@ -1096,7 +1110,7 @@ def page_modify():
             rel_labels.append(label)
             rid_by_label[label] = int(row.release_id)
 
-        rpick = st.selectbox("選擇 release", rel_labels)
+        rpick = st.selectbox("選擇發行作品 release", rel_labels)
         rid = rid_by_label[rpick]
 
         songs = run_df(
@@ -1113,13 +1127,13 @@ def page_modify():
             st.info("此 release 目前沒有歌曲。")
             return
 
-        spick = st.selectbox("選擇歌曲", songs["title"].tolist())
+        spick = st.selectbox("選擇要修改的歌曲 song", songs["title"].tolist())
         srow = songs[songs["title"] == spick].iloc[0]
         sid = int(srow["song_id"])
 
         with st.form("edit_song"):
-            title = st.text_input("title", value=srow["title"]).strip()
-            youtube_url = st.text_input("youtube_url（可空）", value=srow["youtube_url"] if pd.notna(srow["youtube_url"]) else "").strip()
+            title = st.text_input("歌曲名稱 song title", value=srow["title"]).strip()
+            youtube_url = st.text_input("Youtube Link（可空）", value=srow["youtube_url"] if pd.notna(srow["youtube_url"]) else "").strip()
             submit = st.form_submit_button("更新")
 
         if submit:
@@ -1255,8 +1269,9 @@ def main():
                 "🎵 搜尋歌名",
                 "➕ 新增團體",
                 "➕ 新增成員",
+                "➕ 新增發行作品",
                 "➕ 新增歌曲",
-                "🛠️ 修改資訊",
+                "🛠️ 修改資料",
                 "🗑️ 刪除成員",
                 "🗑️ 刪除歌曲",
             ],
@@ -1273,9 +1288,11 @@ def main():
         page_add_group()
     elif page == "➕ 新增成員":
         page_add_member()
+    elif page == "➕ 新增發行作品":
+        page_add_release()
     elif page == "➕ 新增歌曲":
         page_add_song()
-    elif page == "🛠️ 修改資訊":
+    elif page == "🛠️ 修改資料":
         page_modify()
     elif page == "🗑️ 刪除成員":
         page_delete_member()
