@@ -1,8 +1,8 @@
 import re
 import sqlite3
 from pathlib import Path
-
 import pandas as pd
+import streamlit.components.v1 as components
 import streamlit as st
 
 DB_PATH = Path("kpop.db")
@@ -11,6 +11,8 @@ DB_PATH = Path("kpop.db")
 RELEASE_TYPES = ["ALBUM", "EP", "SINGLE", "SINGLE_ALBUM"]
 RELEASE_LANGS = ["KR", "JP", "EN"]
 
+# 資料夾
+GROUP_IMG_DIR = Path("images/groups")
 
 # ---------------------------
 # DB Helpers
@@ -69,6 +71,11 @@ def ensure_db():
         st.error("找不到 kpop.db。請先執行：python init_db.py 以及 python import_from_csv.py --wipe")
         st.stop()
 
+
+def safe_filename(name: str) -> str:
+    name = name.strip()
+    name = re.sub(r"[^\w\-一-龥]+", "_", name)  # 避免奇怪字元
+    return name
 
 # ---------------------------
 # Cached Lookups
@@ -136,13 +143,22 @@ def extract_youtube_id(url: str | None):
     return m.group(1) if m else None
 
 
-def show_youtube(url: str | None):
-    vid = extract_youtube_id(url)
-    if vid:
-        st.video(f"https://www.youtube.com/watch?v={vid}")
-    elif url:
-        st.caption("⚠️ 連結看起來不是標準 YouTube watch/short URL，但仍顯示原連結：")
-        st.write(url)
+def show_youtube(url: str, width: int = 560, height: int = 315):
+    # 支援 youtu.be / watch?v= / embed
+    vid = None
+    if "youtu.be/" in url:
+        vid = url.split("youtu.be/")[-1].split("?")[0]
+    elif "watch?v=" in url:
+        vid = url.split("watch?v=")[-1].split("&")[0]
+    elif "/embed/" in url:
+        vid = url.split("/embed/")[-1].split("?")[0]
+
+    if not vid:
+        st.link_button("開啟 YouTube", url)
+        return
+
+    embed_url = f"https://www.youtube.com/embed/{vid}"
+    components.iframe(embed_url, width=width, height=height)
 
 
 # ---------------------------
@@ -161,7 +177,7 @@ def page_search_groups():
             q_in = st.text_input("團體名稱", placeholder="")
         with c2:
             company_opts = ["全部"] + companies["company_name"].tolist() + ["其他"]
-            company_pick = st.selectbox("進階：公司篩選", company_opts, index=0)
+            company_pick = st.selectbox("進階搜尋：公司", company_opts, index=0)
 
         submitted = st.form_submit_button("搜尋")
 
@@ -383,11 +399,11 @@ def page_search_members():
     with st.form("member_search_form", clear_on_submit=False):
         c1, c2, c3 = st.columns([1.4, 1, 1])
         with c1:
-            q_in = st.text_input("成員藝名（stage_name）", placeholder="")
+            q_in = st.text_input("成員藝名（stage name）", placeholder="")
         with c2:
-            group_pick_in = st.selectbox("進階：團體", group_opts, index=0)
+            group_pick_in = st.selectbox("進階搜尋：團體", group_opts, index=0)
         with c3:
-            nat_pick_in = st.selectbox("進階：國籍", nat_opts, index=0)
+            nat_pick_in = st.selectbox("進階搜尋：國籍", nat_opts, index=0)
 
         submitted = st.form_submit_button("搜尋")
 
@@ -511,20 +527,37 @@ def page_search_members():
 def page_search_songs():
     st.header("🔎 搜尋歌名")
 
+    ensure_db()
     groups = get_groups()
 
-    col1, col2, col3, col4 = st.columns([1.2, 1, 1, 1])
-    with col1:
-        q = st.text_input("歌名關鍵字", placeholder="例如：FEARLESS / Savage …").strip()
-    with col2:
-        group_opts = ["全部"] + groups["group_name"].tolist()
-        group_pick = st.selectbox("進階：團體篩選", group_opts, index=0)
-    with col3:
-        type_opts = ["全部"] + RELEASE_TYPES
-        type_pick = st.selectbox("進階：release_type", type_opts, index=0)
-    with col4:
-        lang_opts = ["全部"] + RELEASE_LANGS
-        lang_pick = st.selectbox("進階：release_lang", lang_opts, index=0)
+    # ---- 1) 搜尋表單：按 Enter 送出（不顯示按鈕）----
+    with st.form("song_search_form", clear_on_submit=False):
+        col1, col2, col3 = st.columns([1.4, 1, 1])
+        with col1:
+            q_in = st.text_input("歌名關鍵字", placeholder="")
+        with col2:
+            group_opts = ["全部"] + groups["group_name"].tolist()
+            group_pick_in = st.selectbox("進階搜尋：團體", group_opts, index=0)
+        with col3:
+            lang_opts = ["全部"] + RELEASE_LANGS
+            lang_pick_in = st.selectbox("進階搜尋：語言", lang_opts, index=0)
+
+        submitted = st.form_submit_button("搜尋")
+
+    if submitted:
+        st.session_state["songs_q"] = q_in.strip()
+        st.session_state["songs_group_pick"] = group_pick_in
+        st.session_state["songs_lang_pick"] = lang_pick_in
+        st.session_state.pop("selected_song_id", None)  # 重新搜尋就清掉舊選取
+
+    # 初次進入：不顯示任何結果
+    if "songs_q" not in st.session_state:
+        st.info("請輸入歌名關鍵字後按 Enter 進行搜尋（可搭配進階篩選）。")
+        return
+
+    q = st.session_state.get("songs_q", "").strip()
+    group_pick = st.session_state.get("songs_group_pick", "全部")
+    lang_pick = st.session_state.get("songs_lang_pick", "全部")
 
     sql = """
     SELECT
@@ -537,8 +570,8 @@ def page_search_songs():
       s.title,
       s.youtube_url
     FROM songs s
-    JOIN releases r ON s.release_id=r.release_id
-    JOIN groups g ON r.group_id=g.group_id
+    JOIN releases r ON s.release_id = r.release_id
+    JOIN groups g ON r.group_id = g.group_id
     WHERE 1=1
     """
     params = []
@@ -546,12 +579,13 @@ def page_search_songs():
     if q:
         sql += " AND s.title LIKE ? "
         params.append(f"%{q}%")
+
+    # 保留進階：團體
     if group_pick != "全部":
         sql += " AND g.group_name = ? "
         params.append(group_pick)
-    if type_pick != "全部":
-        sql += " AND r.release_type = ? "
-        params.append(type_pick)
+
+    # 保留進階：語言
     if lang_pick != "全部":
         sql += " AND r.release_lang = ? "
         params.append(lang_pick)
@@ -564,32 +598,41 @@ def page_search_songs():
         st.info("沒有符合條件的歌曲。")
         return
 
-    # 選一首歌顯示細節 + 內嵌YT
+    # ---- 2) 選一首歌顯示細節 + 內嵌YT ----
     labels = []
     id_by_label = {}
     for row in df.itertuples():
-        label = f"{row.group_name} — {row.title}  ({row.release_name} / {row.release_type}-{row.release_lang})"
+        label = f"{row.group_name} — {row.title}"
         labels.append(label)
         id_by_label[label] = int(row.song_id)
 
-    pick = st.selectbox("選擇歌曲", labels)
+    # 若你想記住上次選的歌，可以用 session_state
+    default_label = labels[0]
+    pick = st.selectbox("選擇歌曲", labels, index=labels.index(default_label))
     sid = id_by_label[pick]
 
     one = df[df["song_id"] == sid].iloc[0]
-    st.subheader("🎵 歌曲資訊")
-    st.write("**團體：**", one["group_name"])
-    st.write("**歌名：**", one["title"])
-    st.write("**發行作品：**", one["release_name"])
-    st.write("**類型/語言：**", f'{one["release_type"]} / {one["release_lang"]}')
-    if pd.notna(one["release_date"]):
-        st.write("**發行日：**", one["release_date"])
 
-    if pd.notna(one["youtube_url"]):
-        st.divider()
+    # ---- 3) 左：影片 / 右：歌曲資訊 ----
+    left, right = st.columns([1.3, 1])  # 左邊大一點給影片
+
+    with left:
         st.subheader("▶️ YouTube")
-        show_youtube(one["youtube_url"])
-    else:
-        st.caption("（此歌曲沒有 YouTube 連結）")
+        if pd.notna(one["youtube_url"]):
+            show_youtube(one["youtube_url"], width=760, height=428)  # 16:9
+        else:
+            st.caption("（此歌曲沒有 YouTube 連結）")
+
+    with right:
+        st.subheader("🎵 歌曲資訊")
+        st.write(" ")
+        st.write("**團體：**", one["group_name"])
+        st.write("**歌名：**", one["title"])
+        st.write("**發行作品：**", one["release_name"])
+        st.write("**類型/語言：**", f'{one["release_type"]} / {one["release_lang"]}')
+        if pd.notna(one["release_date"]):
+            st.write("**發行日：**", one["release_date"])
+
 
 
 # ---------------------------
@@ -598,14 +641,24 @@ def page_search_songs():
 def page_add_group():
     st.header("➕ 新增團體")
 
+    ensure_db()
+
     companies = get_companies()
-    company_opts = ["（不綁定）"] + companies["company_name"].tolist()
+    company_opts = ["（不綁定）"] + companies["company_name"].tolist() + ["其他（新增/輸入）"]
 
     with st.form("add_group", clear_on_submit=True):
-        group_name = st.text_input("團名 group_name（必填、唯一）").strip()
-        company_pick = st.selectbox("公司（可選）", company_opts, index=0)
-        debut_date = st.text_input("出道日 debut_date（YYYY-MM-DD，可空）").strip()
-        fandom_name = st.text_input("粉絲名 fandom_name（可空）").strip()
+        group_name = st.text_input("團體名稱（必填，且不可和已經有的團名一樣）").strip()
+
+        company_pick = st.selectbox("公司", company_opts, index=0)
+        other_company_name = ""
+        if company_pick == "其他（新增/輸入）":
+            other_company_name = st.text_input("輸入新公司名稱 company_name（必填）").strip()
+
+        debut_date = st.text_input("出道日（YYYY-MM-DD，可空）").strip()
+        fandom_name = st.text_input("粉絲名（可空）").strip()
+
+        img = st.file_uploader("團體 LOGO（可選，請上傳 jpg/png 檔）", type=["jpg", "jpeg", "png"])
+
         submit = st.form_submit_button("新增")
 
     if not submit:
@@ -615,23 +668,56 @@ def page_add_group():
         st.error("group_name 不能空白")
         return
 
-    company_name = None if company_pick == "（不綁定）" else company_pick
+    # ---- company_name 決定 ----
+    if company_pick == "（不綁定）":
+        company_name = None
+    elif company_pick == "其他（新增/輸入）":
+        if not other_company_name:
+            st.error("你選了『其他』，請輸入公司名稱")
+            return
+        company_name = other_company_name
+    else:
+        company_name = company_pick
+
+    # ---- 存圖片到資料夾，拿到 image_path ----
+    image_path = None
+    if img is not None:
+        GROUP_IMG_DIR.mkdir(parents=True, exist_ok=True)
+
+        ext = Path(img.name).suffix.lower()  # .jpg/.png
+        base = safe_filename(group_name)
+        save_path = GROUP_IMG_DIR / f"{base}{ext}"
+
+        # 避免同名覆蓋：加 _1, _2...
+        i = 1
+        while save_path.exists():
+            save_path = GROUP_IMG_DIR / f"{base}_{i}{ext}"
+            i += 1
+
+        save_path.write_bytes(img.getvalue())
+        image_path = save_path.as_posix()  # 存相對路徑：images/groups/xxx.jpg
 
     try:
+        # 先確保公司存在（如果你 companies 表已經有的話）
+        if company_name is not None:
+            run_exec(
+                "INSERT OR IGNORE INTO companies (company_name) VALUES (?);",
+                (company_name,),
+            )
+
+        # INSERT groups（你說你欄位就這幾個：group_name, company_name, debut_date, fandom_name, image_path）
         run_exec(
             """
-            INSERT INTO groups (company_id, group_name, debut_date, fandom_name)
-            VALUES (
-              (SELECT company_id FROM companies WHERE company_name = ?),
-              ?, ?, ?
-            );
+            INSERT INTO groups (group_name, company_name, debut_date, fandom_name, image_path)
+            VALUES (?, ?, ?, ?, ?);
             """,
-            (company_name, group_name, norm(debut_date), norm(fandom_name)),
+            (group_name, norm(company_name), norm(debut_date), norm(fandom_name), norm(image_path)),
         )
+
         clear_cache()
         st.success("✅ 新增團體成功")
     except sqlite3.IntegrityError as e:
-        st.error(f"新增失敗（可能團名重複或公司不存在）：{e}")
+        st.error(f"新增失敗（可能團名重複）：{e}")
 
 
 def page_add_member():
