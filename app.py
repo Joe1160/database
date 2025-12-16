@@ -1160,93 +1160,196 @@ def page_modify():
 # ---------------------------
 # Pages: Delete
 # ---------------------------
-def page_delete_member():
-    st.header("🗑️ 刪除成員")
+def page_delete():
+    st.header("🗑️ 刪除資料")
 
-    groups = get_groups()
-    if groups.empty:
-        st.info("目前沒有團體。")
-        return
+    ensure_db()
 
-    gpick = st.selectbox("選團體", groups["group_name"].tolist())
-    gid = int(groups.loc[groups["group_name"] == gpick, "group_id"].iloc[0])
-
-    mem = run_df(
-        """
-        SELECT member_id, stage_name
-        FROM members
-        WHERE group_id=?
-        ORDER BY stage_name COLLATE NOCASE;
-        """,
-        (gid,),
+    mode = st.selectbox(
+        "選擇要刪除的資料類型",
+        ["團體 groups", "成員 members", "發行作品 releases", "歌曲 songs"],
     )
-    if mem.empty:
-        st.info("此團沒有成員。")
-        return
 
-    mpick = st.selectbox("選擇要刪除的成員", mem["stage_name"].tolist())
-    mid = int(mem[mem["stage_name"] == mpick]["member_id"].iloc[0])
+    # -------------------------
+    # 刪除：成員
+    # -------------------------
+    if mode.startswith("成員"):
+        groups = get_groups()
+        if groups.empty:
+            st.info("目前沒有團體。")
+            return
 
-    st.warning("⚠️ 刪除後無法復原，且會一併刪除該成員的多國籍關聯資料。")
-    if st.button("確認刪除", type="primary"):
-        try:
-            run_exec("DELETE FROM members WHERE member_id=?;", (mid,))
-            clear_cache()
-            st.success("✅ 已刪除成員")
-        except sqlite3.IntegrityError as e:
-            st.error(f"刪除失敗：{e}")
+        gpick = st.selectbox("選擇團體 group", groups["group_name"].tolist())
+        gid = int(groups.loc[groups["group_name"] == gpick, "group_id"].iloc[0])
 
+        mem = run_df(
+            """
+            SELECT member_id, stage_name
+            FROM members
+            WHERE group_id=?
+            ORDER BY stage_name COLLATE NOCASE;
+            """,
+            (gid,),
+        )
+        if mem.empty:
+            st.info("此團沒有成員。")
+            return
 
-def page_delete_song():
-    st.header("🗑️ 刪除歌曲")
+        mpick = st.selectbox("選擇要刪除的成員 member", mem["stage_name"].tolist())
+        mid = int(mem.loc[mem["stage_name"] == mpick, "member_id"].iloc[0])
 
-    groups = get_groups()
-    if groups.empty:
-        st.info("目前沒有團體。")
-        return
+        st.warning("⚠️ 刪除後無法復原。")
+        if st.button("確認刪除成員", type="primary"):
+            conn = get_conn()
+            try:
+                # 先刪關聯表，避免外鍵限制
+                conn.execute("DELETE FROM member_nationalities WHERE member_id=?;", (mid,))
+                conn.execute("DELETE FROM members WHERE member_id=?;", (mid,))
+                conn.commit()
+                clear_cache()
+                st.success("✅ 已刪除成員")
+            except sqlite3.IntegrityError as e:
+                conn.rollback()
+                st.error(f"刪除失敗：{e}")
+            finally:
+                conn.close()
 
-    gpick = st.selectbox("選團體", groups["group_name"].tolist())
-    gid = int(groups.loc[groups["group_name"] == gpick, "group_id"].iloc[0])
+    # -------------------------
+    # 刪除：歌曲
+    # -------------------------
+    elif mode.startswith("歌曲"):
+        groups = get_groups()
+        if groups.empty:
+            st.info("目前沒有團體。")
+            return
 
-    rel = get_releases_for_group(gid)
-    if rel.empty:
-        st.info("此團沒有 releases。")
-        return
+        gpick = st.selectbox("選擇團體 group", groups["group_name"].tolist())
+        gid = int(groups.loc[groups["group_name"] == gpick, "group_id"].iloc[0])
 
-    rel_labels = []
-    rid_by_label = {}
-    for row in rel.itertuples():
-        label = f"{row.release_name} ({row.release_type}-{row.release_lang})"
-        rel_labels.append(label)
-        rid_by_label[label] = int(row.release_id)
+        rel = get_releases_for_group(gid)
+        if rel.empty:
+            st.info("此團沒有 releases。")
+            return
 
-    rpick = st.selectbox("選 release", rel_labels)
-    rid = rid_by_label[rpick]
+        rel_labels, rid_by_label = [], {}
+        for row in rel.itertuples():
+            label = f"{row.release_name} ({row.release_type}-{row.release_lang})"
+            rel_labels.append(label)
+            rid_by_label[label] = int(row.release_id)
 
-    songs = run_df(
-        """
-        SELECT song_id, title, youtube_url
-        FROM songs
-        WHERE release_id=?
-        ORDER BY title COLLATE NOCASE;
-        """,
-        (rid,),
-    )
-    if songs.empty:
-        st.info("此 release 沒有歌曲。")
-        return
+        rpick = st.selectbox("選擇發行作品 release", rel_labels)
+        rid = rid_by_label[rpick]
 
-    spick = st.selectbox("選擇要刪除的歌曲", songs["title"].tolist())
-    sid = int(songs[songs["title"] == spick]["song_id"].iloc[0])
+        songs = run_df(
+            """
+            SELECT song_id, title, youtube_url
+            FROM songs
+            WHERE release_id=?
+            ORDER BY title COLLATE NOCASE;
+            """,
+            (rid,),
+        )
+        if songs.empty:
+            st.info("此 release 沒有歌曲。")
+            return
 
-    st.warning("⚠️ 刪除後無法復原。")
-    if st.button("確認刪除", type="primary"):
-        try:
-            run_exec("DELETE FROM songs WHERE song_id=?;", (sid,))
-            clear_cache()
-            st.success("✅ 已刪除歌曲")
-        except sqlite3.IntegrityError as e:
-            st.error(f"刪除失敗：{e}")
+        spick = st.selectbox("選擇要刪除的歌曲 song", songs["title"].tolist())
+        sid = int(songs.loc[songs["title"] == spick, "song_id"].iloc[0])
+
+        st.warning("⚠️ 刪除後無法復原。")
+        if st.button("確認刪除歌曲", type="primary"):
+            try:
+                run_exec("DELETE FROM songs WHERE song_id=?;", (sid,))
+                clear_cache()
+                st.success("✅ 已刪除歌曲")
+            except sqlite3.IntegrityError as e:
+                st.error(f"刪除失敗：{e}")
+
+    # -------------------------
+    # 刪除：發行作品（會連帶 songs）
+    # -------------------------
+    elif mode.startswith("發行作品"):
+        groups = get_groups()
+        if groups.empty:
+            st.info("目前沒有團體。")
+            return
+
+        gpick = st.selectbox("選擇團體 group", groups["group_name"].tolist())
+        gid = int(groups.loc[groups["group_name"] == gpick, "group_id"].iloc[0])
+
+        rel = get_releases_for_group(gid)
+        if rel.empty:
+            st.info("此團沒有 releases。")
+            return
+
+        rel_labels, rid_by_label = [], {}
+        for row in rel.itertuples():
+            label = f"{row.release_name} ({row.release_type}-{row.release_lang})"
+            rel_labels.append(label)
+            rid_by_label[label] = int(row.release_id)
+
+        rpick = st.selectbox("選擇要刪除的發行作品 release", rel_labels)
+        rid = rid_by_label[rpick]
+
+        st.warning("⚠️ 刪除該發行作品 release 會一併刪除該 release 底下的所有歌曲（songs）。")
+        if st.button("確認刪除發行作品", type="primary"):
+            conn = get_conn()
+            try:
+                # 若 DB 沒設 CASCADE，手動先刪 songs
+                conn.execute("DELETE FROM songs WHERE release_id=?;", (rid,))
+                conn.execute("DELETE FROM releases WHERE release_id=?;", (rid,))
+                conn.commit()
+                clear_cache()
+                st.success("✅ 已刪除發行作品")
+            except sqlite3.IntegrityError as e:
+                conn.rollback()
+                st.error(f"刪除失敗：{e}")
+            finally:
+                conn.close()
+
+    # -------------------------
+    # 刪除：團體（會連帶 members / releases / songs / member_nationalities）
+    # -------------------------
+    else:  # 團體
+        groups = get_groups()
+        if groups.empty:
+            st.info("目前沒有團體。")
+            return
+
+        gpick = st.selectbox("選擇要刪除的團體 group", groups["group_name"].tolist())
+        gid = int(groups.loc[groups["group_name"] == gpick, "group_id"].iloc[0])
+
+        st.warning("⚠️ 刪除團體 group 會一併刪除：該團成員、發行作品、歌曲。不可復原。")
+        if st.button("確認刪除團體", type="primary"):
+            conn = get_conn()
+            try:
+                # 1) 刪 member_nationalities（先找出該團所有 member_id）
+                mids = run_df("SELECT member_id FROM members WHERE group_id=?;", (gid,))["member_id"].tolist()
+                if mids:
+                    conn.executemany("DELETE FROM member_nationalities WHERE member_id=?;", [(int(x),) for x in mids])
+
+                # 2) 刪 songs（透過 releases）
+                conn.execute(
+                    """
+                    DELETE FROM songs
+                    WHERE release_id IN (SELECT release_id FROM releases WHERE group_id=?);
+                    """,
+                    (gid,),
+                )
+
+                # 3) 刪 releases、members、groups
+                conn.execute("DELETE FROM releases WHERE group_id=?;", (gid,))
+                conn.execute("DELETE FROM members WHERE group_id=?;", (gid,))
+                conn.execute("DELETE FROM groups WHERE group_id=?;", (gid,))
+
+                conn.commit()
+                clear_cache()
+                st.success("✅ 已刪除團體（含關聯資料）")
+            except sqlite3.IntegrityError as e:
+                conn.rollback()
+                st.error(f"刪除失敗：{e}")
+            finally:
+                conn.close()
 
 
 # ---------------------------
@@ -1272,8 +1375,7 @@ def main():
                 "➕ 新增發行作品",
                 "➕ 新增歌曲",
                 "🛠️ 修改資料",
-                "🗑️ 刪除成員",
-                "🗑️ 刪除歌曲",
+                "🗑️ 刪除資料"
             ],
     )
 
@@ -1294,10 +1396,8 @@ def main():
         page_add_song()
     elif page == "🛠️ 修改資料":
         page_modify()
-    elif page == "🗑️ 刪除成員":
-        page_delete_member()
-    elif page == "🗑️ 刪除歌曲":
-        page_delete_song()
+    elif page == "🗑️ 刪除資料":
+        page_delete()
 
 
 
