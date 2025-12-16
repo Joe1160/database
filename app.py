@@ -13,6 +13,7 @@ RELEASE_LANGS = ["KR", "JP", "EN"]
 
 # 資料夾
 GROUP_IMG_DIR = Path("images/groups")
+MEMBER_IMG_DIR = Path("images/members")
 
 # ---------------------------
 # DB Helpers
@@ -644,26 +645,23 @@ def page_add_group():
     ensure_db()
 
     companies = get_companies()
-    company_opts = ["（不綁定）"] + companies["company_name"].tolist() + ["其他（新增/輸入）"]
+    company_opts = ["（不綁定）"] + companies["company_name"].tolist()
 
     with st.form("add_group", clear_on_submit=True):
         group_name = st.text_input("團體名稱（必填，且不可和已經有的團名一樣）").strip()
-
         company_pick = st.selectbox("公司", company_opts, index=0)
-        other_company_name = ""
-        if company_pick == "其他（新增/輸入）":
-            other_company_name = st.text_input("輸入新公司名稱 company_name（必填）").strip()
 
         debut_date = st.text_input("出道日（YYYY-MM-DD，可空）").strip()
         fandom_name = st.text_input("粉絲名（可空）").strip()
-
         img = st.file_uploader("團體 LOGO（可選，請上傳 jpg/png 檔）", type=["jpg", "jpeg", "png"])
 
         submit = st.form_submit_button("新增")
 
+    # ✅ 沒按新增就不要往下跑（關鍵）
     if not submit:
         return
 
+    # ✅ 按了新增才開始檢查/寫入
     if not group_name:
         st.error("group_name 不能空白")
         return
@@ -671,11 +669,6 @@ def page_add_group():
     # ---- company_name 決定 ----
     if company_pick == "（不綁定）":
         company_name = None
-    elif company_pick == "其他（新增/輸入）":
-        if not other_company_name:
-            st.error("你選了『其他』，請輸入公司名稱")
-            return
-        company_name = other_company_name
     else:
         company_name = company_pick
 
@@ -684,34 +677,29 @@ def page_add_group():
     if img is not None:
         GROUP_IMG_DIR.mkdir(parents=True, exist_ok=True)
 
-        ext = Path(img.name).suffix.lower()  # .jpg/.png
+        ext = Path(img.name).suffix.lower()
         base = safe_filename(group_name)
         save_path = GROUP_IMG_DIR / f"{base}{ext}"
 
-        # 避免同名覆蓋：加 _1, _2...
         i = 1
         while save_path.exists():
             save_path = GROUP_IMG_DIR / f"{base}_{i}{ext}"
             i += 1
 
         save_path.write_bytes(img.getvalue())
-        image_path = save_path.as_posix()  # 存相對路徑：images/groups/xxx.jpg
+        image_path = save_path.as_posix()
 
     try:
-        # 先確保公司存在（如果你 companies 表已經有的話）
-        if company_name is not None:
-            run_exec(
-                "INSERT OR IGNORE INTO companies (company_name) VALUES (?);",
-                (company_name,),
-            )
-
-        # INSERT groups（你說你欄位就這幾個：group_name, company_name, debut_date, fandom_name, image_path）
+        # 不用再 INSERT companies，因為你只能選既有公司
         run_exec(
             """
-            INSERT INTO groups (group_name, company_name, debut_date, fandom_name, image_path)
-            VALUES (?, ?, ?, ?, ?);
+            INSERT INTO groups (company_id, group_name, debut_date, fandom_name, image_path)
+            VALUES (
+              (SELECT company_id FROM companies WHERE company_name = ?),
+              ?, ?, ?, ?
+            );
             """,
-            (group_name, norm(company_name), norm(debut_date), norm(fandom_name), norm(image_path)),
+            (company_name, group_name, norm(debut_date), norm(fandom_name), norm(image_path)),
         )
 
         clear_cache()
@@ -721,7 +709,7 @@ def page_add_group():
 
 
 def page_add_member():
-    st.header("➕ 新增成員（含多國籍）")
+    st.header("➕ 新增成員（選擇團體）")
 
     groups = get_groups()
     nat = get_nationalities()
@@ -735,10 +723,13 @@ def page_add_member():
 
     with st.form("add_member", clear_on_submit=True):
         group_pick = st.selectbox("所屬團體", group_opts)
-        stage_name = st.text_input("藝名 stage_name（必填）").strip()
-        real_name = st.text_input("本名 real_name（可空）").strip()
-        birth_date = st.text_input("生日 birth_date（YYYY-MM-DD，可空）").strip()
+        stage_name = st.text_input("藝名 stage name（必填）").strip()
+        real_name = st.text_input("本名 real name（可空）").strip()
+        birth_date = st.text_input("生日（YYYY-MM-DD，可空）").strip()
         nat_pick = st.multiselect("國籍（可多選，可空）", nat_opts)
+
+        img = st.file_uploader("成員照片（可選，jpg/png）", type=["jpg", "jpeg", "png"])
+
         submit = st.form_submit_button("新增")
 
     if not submit:
@@ -750,14 +741,31 @@ def page_add_member():
 
     gid = int(groups.loc[groups["group_name"] == group_pick, "group_id"].iloc[0])
 
+    # ---- 存照片到資料夾，拿到 image_path ----
+    image_path = None
+    if img is not None:
+        MEMBER_IMG_DIR.mkdir(parents=True, exist_ok=True)
+
+        ext = Path(img.name).suffix.lower()
+        base = safe_filename(f"{group_pick}_{stage_name}")  # 避免不同團同名
+        save_path = MEMBER_IMG_DIR / f"{base}{ext}"
+
+        i = 1
+        while save_path.exists():
+            save_path = MEMBER_IMG_DIR / f"{base}_{i}{ext}"
+            i += 1
+
+        save_path.write_bytes(img.getvalue())
+        image_path = save_path.as_posix()  # 存相對路徑
+
     conn = get_conn()
     try:
         cur = conn.execute(
             """
-            INSERT INTO members (group_id, stage_name, real_name, birth_date)
-            VALUES (?, ?, ?, ?);
+            INSERT INTO members (group_id, stage_name, real_name, birth_date, image_path)
+            VALUES (?, ?, ?, ?, ?);
             """,
-            (gid, stage_name, norm(real_name), norm(birth_date)),
+            (gid, stage_name, norm(real_name), norm(birth_date), norm(image_path)),
         )
         member_id = cur.lastrowid
 
