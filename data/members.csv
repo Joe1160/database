@@ -1,16 +1,76 @@
 group_name,stage_name,real_name,birth_date,image_path
-LE SSERAFIM,Sakura,Miyawaki Sakura 宮脇 咲良,1998-03-19
-LE SSERAFIM,Chaewon,Kim Chae-Won 金采源,2000-08-01
-LE SSERAFIM,Yunjin,Huh Yun-Jin 許允眞,2001-10-08
-LE SSERAFIM,Kazuha,Nakamura Kazuha 中村 一葉,2003-08-09
-LE SSERAFIM,Eunchae,Hong Eun-Chae 洪恩採,2006-11-10
-ILLIT,Yunah,Roh Yun-ah 盧玧我,2004-01-15
-ILLIT,Minju,Park Min-ju 朴慜柱,2004-5-11
-ILLIT,Moka,Sakai Moka 境 萌花,2004-10-8
-ILLIT,Wonhee,Lee Won-hee 李沅禧,2007-6-26
-ILLIT,Iroha,Hokazono Iroha 外園 彩羽,2008-02-04
+LE SSERAFIM,Sakura,Miyawaki Sakura 宮脇 咲良,1998-03-19,images\members\le_sserafim\sakura.jpg
+LE SSERAFIM,Chaewon,Kim Chae-Won 金采源,2000-08-01,images\members\le_sserafim\chaewon.jpg
+LE SSERAFIM,Yunjin,Huh Yun-Jin 許允眞,2001-10-08,images\members\le_sserafim\yunjin.jpg
+LE SSERAFIM,Kazuha,Nakamura Kazuha 中村 一葉,2003-08-09,images\members\le_sserafim\kazuha.png
+LE SSERAFIM,Eunchae,Hong Eun-Chae 洪恩採,2006-11-10,images\members\le_sserafim\eunchae.png
+ILLIT,Yunah,Roh Yun-ah 盧玧我,2004-01-15,images\members\illit\yunah.png
+ILLIT,Minju,Park Min-ju 朴慜柱,2004-5-11,images\members\illit\minju.png
+ILLIT,Moka,Sakai Moka 境 萌花,2004-10-8,images\members\illit\moka.png
+ILLIT,Wonhee,Lee Won-hee 李沅禧,2007-6-26,images\members\illit\wonhee.png
+ILLIT,Iroha,Hokazono Iroha 外園 彩羽,2008-02-04,images\members\illit\iroha.png
 NewJeans,Minji,Kim Minji 金玟池,2004-05-07,images\members\newjeans\minji.jpg
 NewJeans,Hanni,Phạm Ngọc Hân 范玉欣,2004-10-06,images\members\newjeans\hanni.jpg
 NewJeans,Danielle,Danielle June Marsh,2005-04-11,images\members\newjeans\danielle.jpg
 NewJeans,Haerin,Kang Haerin 姜諧潾,2006-05-15,images\members\newjeans\haerin.jpg
-NewJeans,Hyein,Lee Hyein 李惠仁,2008-04-21,images\members\newjeans\hyein.png
+NewJeans,Hyein,Lee Hyein 李惠仁,2008-04-21,images\members\newjeans\hyein.jpg
+BLACKPINK,Jisoo,Kim Ji-soo 金智秀,1995-01-03,images\members\blackpink\jisoo.png
+BLACKPINK,Jennie,Kim Jennie,1996-01-16,images\members\blackpink\jennie.png
+BLACKPINK,Rosé,Park Chae-young 朴彩英,1997-02-11,images\members\blackpink\rosé.jpg
+BLACKPINK,Lisa,Lalisa Manoban,1997-03-27,images\members\blackpink\lisa.jpg
+BABYMONSTER,Ruka,Kawai Ruka 河井 瑠花,2002-03-20,images\members\babymonster\ruka.jpeg
+BABYMONSTER,Pharita,Pharita Boonpakdeethaveeyod,2005-08-26,images\members\babymonster\pharita.jpeg
+BABYMONSTER,Asa,Enami Asa,2006-04-17,images\members\babymonster\asa.jpeg
+BABYMONSTER,Ahyeon,Jung A-hyeon 鄭雅賢,2007-04-11,images\members\babymonster\ahyeon.jpg
+BABYMONSTER,Rami,Shin Ha-ram 申厦藍,2007-10-17,images\members\babymonster\rami.jpeg
+BABYMONSTER,Rora,Lee Da-in 李茶仁,2008-08-14,images\members\babymonster\rora.jpeg
+BABYMONSTER,Chiquita,Riracha Pondechaphiphat,2009-02-17,images\members\babymonster\chiquita.jpeg
+Twice,NAYEON,Lim Nayeon 林娜璉,1995-09-22,images\members\twice\NAYEON.png
+Twice,JEONGYEON,Yoo Jeongyeon 兪定延,1996-11-01,images\members\twice\Jeongyeon.jpg
+Twice,MOMO,Hirai Momo 平井 桃,1996-11-09,images\members\twice\MOMO.jpg
+Twice,SANA,Minatozaki Sana 湊崎 紗夏,1996-12-29,images\members\twice\Sana.png
+Twice,JIHYO,Park Jihyo 朴志效,1997-02-01,images\members\twice\Jihyo.jpg
+Twice,MINA,Myoi Mina 名井 南,1997-03-24,images\members\twice\Mina.jpg
+Twice,DAHYUN,Kim Dahyun 金多賢,1998-05-28,images\members\twice\DAHYUN.png
+Twice,CHAEYOUNG,Son Chaeyoung 孫彩瑛,1999-04-23,images\members\twice\Chayeong.png
+Twice,TZUYU,Chou Tzuyu 周子瑜,1999-06-14,images\members\twice\Tzuyu.jpg
+ITZY,Yeji,Hwang Ye-Ji 黃禮志,2000-05-26
+ITZY,Lia,Choi Ji-Soo 崔智壽,2000-07-21
+ITZY,Ryujin,Shin Ryu-Jin 申留眞,2001-04-17
+ITZY,Chaeryeong,Lee Chae-Ryeong 李彩領,2001-06-05
+ITZY,Yuna,Shin Yu-Na 申有娜,2003-12-09
+NMIXX,Haewon,Oh Hae Won	吳海嫄,2003-02-25
+NMIXX,Lily,Lily Jin Park Morrow,2002-10-17
+NMIXX,Sullyoon,Seol Yoon Ah	薛侖娥,2004-01-26
+NMIXX,Bae,Bae Jin Sol 裴眞率,2004-12-28
+NMIXX,Jiwoo,Kim Ji Woo 金智友,2005-04-13
+NMIXX,Kyujin,Jang Kyu Jin 張圭珍,2006-05-26
+TAEYEON,Taeyeon,Kim Tae-yeon 金太妍,1989-03-09,images\members\solo\taeyeon.jpg
+Red Velvet,Irene,Bae Ju-Hyun 裵柱現,1991-03-29
+Red Velvet,Seulgi,Kang Seul-Gi 康瑟琪,1994-02-10
+Red Velvet,Wendy,Shon Seung-Wan 孫承完,1994-02-21
+Red Velvet,Joy,Park Soo-Young 朴秀英,1996-09-03
+Red Velvet,Yeri,Kim Ye-Rim 金藝琳,1999-03-05
+aespa,Karina,Yu Ji-min 劉知珉,2000-04-11
+aespa,Winter,Kim Min-jeong 金旼炡,2001-01-01
+aespa,Giselle,Uchinaga Eri 內永枝利,2000-10-30
+aespa,NingNing,Ning Yi-zhuo 寧藝卓,2002-10-23
+Hearts2Hearts,CARMEN,Nyoman Ayu Carmenita,2006-03-28
+Hearts2Hearts,JIWOO,Choi Ji-woo 崔志宇,2006-09-07
+Hearts2Hearts,YUHA,Yu Ha-ram 柳河覽,2007-04-12
+Hearts2Hearts,STELLA,Kim Da-hyun 金多絢,2007-06-18
+Hearts2Hearts,JUUN,Kim Ju-eun 金主恩,2008-12-03
+Hearts2Hearts,A-NA,Noh Yu-na 盧惟娜,2008-12-20
+Hearts2Hearts,IAN,Jung I-an 鄭以安,2009-10-09
+Hearts2Hearts,YE-ON,Kim Na-yeon 金奈延,2010-04-19
+IVE,Gaeul,Kim Gaeul 金秋天,2002-09-24,images\members\ive\gaeul.jpg
+IVE,Yujin,An Yujin 安兪眞,2003-09-01,images\members\ive\yujin.png
+IVE,Rei,Naoi Rei 直井 怜,2004-02-03,images\members\ive\rei.png
+IVE,Wonyoung,Jang Wonyoung 張員瑛,2004-08-31,images\members\ive\wonyoung.jpg
+IVE,Liz,Kim Jiwon 金志垣,2004-11-21,images\members\ive\liz.jpg
+IVE,Leeseo,Lee Hyunseo 李賢瑞,2007-02-21,images\members\ive\leeseo.jpg
+KiiiKiii,Leesol,Lee Su-min 李修旻,2005-09-18,images\members\kiiikiii\leesol.jpg
+KiiiKiii,Sui,Lee Su-bin 李守彬,2006-04-10,images\members\kiiikiii\sui.jpeg
+KiiiKiii,Jiyu,Seo Ji-Yu 徐知裕,2006-05-14,images\members\kiiikiii\jiyu.jpg
+KiiiKiii,Haum,Kwak Ha-um 郭河音,2006-11-14,images\members\kiiikiii\haum.jpg
+KiiiKiii,Kya,Park Ji-woo 朴祉禹,2010-12-18,images\members\kiiikiii\kya.jpg
